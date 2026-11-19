@@ -1,0 +1,10 @@
+{
+  "name": "open-voice",
+  "version": "1.0.0",
+  "description": "Interactive 3D vocal tract model for voice training: what narrows the sound and how exercises open it.",
+  "type": "module",
+  "scripts": { "build": "node build.mjs" },
+  "dependencies": { "three": "0.170.0" },
+  "devDependencies": { "esbuild": "^0.24.0" },
+  "license": "MIT"
+}

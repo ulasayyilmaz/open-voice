@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Open Voice — 3D Vocal Tract Trainer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#0d1317;--panel:#121b21;--line:#22313a;--ink:#e6edf1;--mute:#8fa3ae;--air:#5fd0ff;--bad:#ff5a5f;--mid:#f2c14e;--good:#4fd1a5;--acc:#ffb35c}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:14px/1.5 "IBM Plex Sans",system-ui,sans-serif}
+#app{display:grid;grid-template-columns:1fr 400px;height:100vh}
+#stage{position:relative;overflow:hidden;min-height:0}
+#c3d{width:100%;height:100%;display:block;cursor:grab}
+#c3d:active{cursor:grabbing}
+#labels{position:absolute;inset:0;pointer-events:none}
+.lbl{position:absolute;left:0;top:0;pointer-events:auto;cursor:pointer;white-space:nowrap;font-size:11.5px;color:#dfe9ee}
+.lbl i{position:absolute;left:-3px;top:-3px;width:6px;height:6px;border-radius:50%;background:#fff;box-shadow:0 0 0 2px rgba(0,0,0,.4)}
+.lbl span{position:absolute;left:8px;top:-9px;background:rgba(10,16,20,.72);padding:1px 6px;border-radius:4px;border:1px solid rgba(255,255,255,.08)}
+.warn{position:absolute;left:0;top:0;display:none;pointer-events:none;font-size:12px;font-weight:600;color:#fff;background:rgba(220,50,60,.92);padding:3px 8px;border-radius:12px;margin:-28px 0 0 -10px;white-space:nowrap;box-shadow:0 2px 10px rgba(0,0,0,.4)}
+.warn::after{content:"";position:absolute;left:8px;bottom:-5px;border:5px solid transparent;border-bottom:0;border-top-color:rgba(220,50,60,.92)}
+.warn.on{display:block;animation:pulse 1.6s ease-in-out infinite}
+.warn.info{background:rgba(70,130,190,.92)}.warn.info::after{border-top-color:rgba(70,130,190,.92)}
+@keyframes pulse{50%{opacity:.75}}
+.lbl:hover span,.lbl.sel span{background:var(--acc);color:#1a1205;border-color:transparent}
+#topbar{position:absolute;left:12px;top:12px;right:12px;display:flex;flex-wrap:wrap;gap:6px;pointer-events:none}
+#topbar .grp{display:flex;gap:2px;background:rgba(14,21,26,.85);border:1px solid var(--line);border-radius:8px;padding:3px;pointer-events:auto}
+#topbar .grp span{font-size:10.5px;color:var(--mute);padding:4px 6px 0 6px;text-transform:uppercase;letter-spacing:.06em}
+button{font:inherit;color:inherit;background:none;border:0;cursor:pointer}
+.tb{padding:4px 9px;border-radius:6px;font-size:12px;color:var(--mute)}
+.tb:hover{color:var(--ink);background:#1b2830}
+.tb.on{background:#23343e;color:var(--ink)}
+#hud{position:absolute;right:12px;top:58px;width:230px;background:rgba(14,21,26,.88);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+#hud h5,#scopeBox h5{margin:0 0 6px;font-size:10.5px;letter-spacing:.08em;text-transform:uppercase;color:var(--mute);font-weight:500}
+.m{margin:6px 0}
+.m label{display:flex;justify-content:space-between;font-size:12px}
+.m label em{font-style:normal;color:var(--mute);font-size:11px}
+.m div{height:5px;background:#1f2c34;border-radius:3px;overflow:hidden;margin-top:3px}
+.m b{display:block;height:100%;width:50%;transition:width .2s}
+.legend{display:flex;gap:10px;font-size:11px;color:var(--mute);margin-top:8px;flex-wrap:wrap}
+.legend i{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:4px;vertical-align:-1px}
+#scopeBox{position:absolute;left:12px;bottom:98px;background:rgba(14,21,26,.88);border:1px solid var(--line);border-radius:10px;padding:8px 10px;width:190px}
+#scope{display:block;margin:0 auto}
+#scopeState{font-size:11.5px;text-align:center;margin-top:2px}
+.good{color:var(--good)}.mid{color:var(--mid)}.bad{color:var(--bad)}
+#caption{position:absolute;left:12px;right:12px;bottom:12px;background:rgba(14,21,26,.92);border:1px solid var(--line);border-radius:10px;padding:10px 14px;display:flex;gap:14px;align-items:center;min-height:70px}
+#capTitle{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--acc);font-weight:600}
+#capText{font-size:15px;margin-top:2px}
+#capWrap{flex:1;min-width:0}
+#ctrls{display:none;align-items:center;gap:6px}
+#ctrls.show{display:flex}
+#ctrls button{width:32px;height:32px;border-radius:8px;background:#1d2a32;font-size:13px}
+#ctrls button:hover{background:#26363f}
+#ctrls input{width:70px}
+#dots{display:flex;gap:4px;margin-top:6px}
+#dots i{width:22px;height:4px;border-radius:2px;background:#26353e;position:relative;overflow:hidden}
+#dots i.done{background:#5b6f7a}
+#dots i.on{background:#26353e}
+#dots i.on::after{content:"";position:absolute;left:0;top:0;bottom:0;width:var(--p,0);background:var(--acc)}
+#progWrap{height:3px;background:#1f2c34;border-radius:2px;margin-top:6px;overflow:hidden;display:none}
+#ctrls.show ~ #capWrap #progWrap, .ex-on #progWrap{display:block}
+#prog{height:100%;width:0;background:var(--acc)}
+#hint{position:absolute;right:12px;bottom:96px;font-size:11px;color:var(--mute);background:rgba(14,21,26,.7);padding:4px 8px;border-radius:6px}
+aside{background:var(--panel);border-left:1px solid var(--line);display:flex;flex-direction:column;min-height:0}
+.brand{padding:14px 16px 8px}
+.brand h1{margin:0;font-size:17px;font-weight:600;letter-spacing:-.01em}
+.brand p{margin:2px 0 0;color:var(--mute);font-size:12.5px}
+.tabs{display:flex;flex-wrap:wrap;gap:2px;padding:0 10px 8px;border-bottom:1px solid var(--line)}
+.tab{padding:6px 9px;border-radius:6px;color:var(--mute);font-size:12.5px}
+.tab.on{background:#1f2e37;color:var(--ink)}
+.pane{display:none;overflow:auto;padding:14px 16px 30px;flex:1}
+.pane.on{display:block}
+.pane h3{margin:0 0 6px;font-size:15px}
+.pane h4{margin:14px 0 4px;font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--acc);font-weight:600}
+.pane p,.pane li{color:#c9d6dd}
+.pane ol,.pane ul{padding-left:18px;margin:4px 0}
+.pane li{margin:3px 0}
+.note{background:#162229;border:1px solid var(--line);border-left:3px solid var(--air);border-radius:6px;padding:9px 11px;margin:10px 0;font-size:13px;color:#c9d6dd}
+.note.warn{border-left-color:var(--acc)}
+#info{display:none;background:#182630;border:1px solid #2a3d48;border-radius:8px;padding:10px 12px;margin:10px 0}
+#info.show{display:block}
+#info p{margin:0}
+.chips{display:flex;flex-wrap:wrap;gap:5px;margin-top:8px}
+.chip{font-size:12px;padding:4px 9px;border-radius:14px;background:#1a2730;color:#c9d6dd;border:1px solid #24343e}
+.chip:hover{background:#243640}
+.state{display:block;width:100%;text-align:left;padding:8px 10px;border-radius:7px;background:#172229;border:1px solid #22313a;margin:4px 0;font-size:13px}
+.state:hover{background:#1d2b33}.state.on{border-color:var(--acc);background:#22303a}
+#stateText{min-height:60px}
+.range{margin:14px 0}
+.range .ends{display:flex;justify-content:space-between;font-size:12px;color:var(--mute)}
+input[type=range]{width:100%;accent-color:var(--acc)}
+.sl{display:block;margin:10px 0}
+.sl span{display:block;font-size:13px}
+.sl small{display:block;color:var(--mute);font-size:12px;margin-top:1px}
+.ex{display:flex;gap:10px;align-items:center;width:100%;text-align:left;padding:8px 10px;border-radius:8px;background:#172229;border:1px solid #22313a;margin:5px 0}
+.ex:hover{background:#1d2b33}.ex.on{border-color:var(--acc);background:#22303a}
+.ex .n{width:22px;height:22px;border-radius:50%;background:#24343e;display:grid;place-items:center;font-size:11.5px;flex:none}
+.ex b{display:block;font-size:13.5px;font-weight:600}
+.ex small{color:var(--mute);font-size:11.5px}
+.ex .play{margin-left:auto;color:var(--acc);font-size:12px}
+.ex > span:nth-child(2){flex:1}
+.exd{margin-top:14px;border-top:1px solid var(--line);padding-top:12px}
+.exd .goal{color:#dbe6ec}
+.exd .ev{font-size:12.5px;color:var(--mute)}
+.card{background:#172229;border:1px solid #22313a;border-radius:8px;padding:9px 11px;margin:8px 0}
+.card h4{margin:0 0 3px}
+.card p{margin:0;font-size:13px}
+#sources li{font-size:12.5px}
+a{color:#7cc4ff}
+@media (max-width:900px){
+  #app{grid-template-columns:1fr;grid-template-rows:62vh auto;height:auto}
+  aside{border-left:0;border-top:1px solid var(--line)}
+  .pane{max-height:none}
+  #topbar{flex-wrap:nowrap;overflow-x:auto;left:8px;right:8px;top:8px;scrollbar-width:none}
+  #topbar .grp{flex:none}
+  #topbar .grp span{display:none}
+  .tb{padding:4px 7px;font-size:11.5px;white-space:nowrap}
+  #hud{width:190px;top:50px;padding:7px 9px}
+  .lbl{font-size:10.5px}
+  #caption{left:8px;right:8px;bottom:8px;padding:8px 10px;min-height:0;flex-wrap:wrap}
+  #ctrls button{width:28px;height:28px}
+  #scopeBox{display:none}
+  #hint{display:none}
+  #capText{font-size:13px}
+}
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stage">
+    <canvas id="c3d"></canvas>
+    <div id="labels"></div>
+    <div id="topbar">
+      <div class="grp"><span>View</span>
+        <button class="tb" data-cam="context">Whole body</button>
+        <button class="tb" data-cam="head">Head &amp; neck</button>
+        <button class="tb" data-cam="throat">Throat</button>
+        <button class="tb" data-cam="nose">Nose</button>
+        <button class="tb" data-cam="larynx">Larynx</button>
+        <button class="tb" data-cam="front">3/4</button>
+      </div>
+      <div class="grp"><span>Show</span>
+        <button class="tb on" data-layer="section" title="Cut away the near half (sagittal section)">Cut-away</button>
+        <button class="tb on" data-layer="skin">Skin</button>
+        <button class="tb on" data-layer="bone">Bone</button>
+        <button class="tb on" data-layer="muscle">Soft tissue</button>
+        <button class="tb on" data-layer="air">Air</button>
+        <button class="tb on" data-layer="labels">Labels</button>
+        <button class="tb on" data-layer="sens">Sensations</button>
+        <button class="tb on" data-layer="hud">Meters</button>
+      </div>
+    </div>
+    <div id="hud">
+      <h5>Vocal tract now</h5>
+      <div class="m" id="mHead"><label>Head / neck <em></em></label><div><b></b></div></div>
+      <div class="m" id="mLar"><label>Larynx height <em></em></label><div><b></b></div></div>
+      <div class="m" id="mPhar"><label>Throat space <em></em></label><div><b></b></div></div>
+      <div class="m" id="mFvf"><label>False folds <em></em></label><div><b></b></div></div>
+      <div class="m" id="mVel"><label>Soft palate <em></em></label><div><b></b></div></div>
+      <div class="m" id="mNose"><label>Nasal passage <em></em></label><div><b></b></div></div>
+      <div class="legend"><span><i style="background:#5fd0ff"></i>open air</span><span><i style="background:#f2c14e"></i>narrow</span><span><i style="background:#ff4b55"></i>pinched</span><span><i style="background:#ffd36a"></i>feel here</span></div>
+    </div>
+    <div id="scopeBox"><h5>Larynx from above</h5><canvas id="scope" width="170" height="130"></canvas><div id="scopeState"></div></div>
+    <div id="hint">Drag to rotate · scroll/pinch to zoom · shift-drag to pan · click any structure</div>
+    <div id="caption">
+      <div id="capWrap"><div id="capTitle"></div><div id="capText"></div><div id="dots"></div><div id="progWrap" style="display:block"><div id="prog"></div></div></div>
+      <div id="ctrls">
+        <button id="bPrev" title="Previous step">◀</button>
+        <button id="bPlay" title="Pause / play">❚❚</button>
+        <button id="bNext" title="Next step">▶</button>
+        <input id="speed" type="range" min="40" max="160" value="100" title="Speed">
+        <button id="bStop" title="Back to open state">✕</button>
+      </div>
+    </div>
+  </div>
+  <aside>
+    <div class="brand"><h1>Open Voice · 3D vocal tract</h1><p>See what narrows the sound, and how training opens it.</p></div>
+    <div class="tabs">
+      <button class="tab on" data-tab="explore">Explore</button>
+      <button class="tab" data-tab="why">Why it feels blocked</button>
+      <button class="tab" data-tab="exercises">Exercises</button>
+      <button class="tab" data-tab="checks">Self-checks</button>
+      <button class="tab" data-tab="plan">Practice plan</button>
+      <button class="tab" data-tab="sources">Sources</button>
+    </div>
+    <div class="pane on" id="p-explore">
+      <p>This is a cut-away of the head, neck and chest seen from the side, face to the right. The <b style="color:var(--air)">glowing column</b> is the air and sound path: from the lungs up the trachea, through the vocal folds and the throat, then out through the <b>mouth</b> or, past the soft palate, through the <b>nose</b>.</p>
+      <p>It starts in quiet nose breathing. Use the <b>View</b> buttons to zoom from the whole body down to the larynx. Click any structure or label to learn what it does and how to feel it from the inside.</p>
+      <div id="info"></div>
+      <h4>Structures</h4>
+      <div class="chips" id="chips"></div>
+      <div class="note">The model is a simplified, schematic midline section, built to show <i>relationships</i> (what sits where and what narrows what). It is not a medical-grade scan.</div>
+    </div>
+    <div class="pane" id="p-why">
+      <p>A throat-dominant voice is rarely caused by one solid blockage. Usually several <b>muscular habits</b> narrow the tube at the same time, and all of them can be trained:</p>
+      <ol><li>The head pokes forward, so the larynx is pulled up.</li><li>The tongue root is pulled back into the throat.</li><li>The throat walls (constrictors) squeeze.</li><li>The false vocal folds squeeze.</li><li>The soft palate is passive.</li></ol>
+      <div class="note"><b>About the mouth-to-nose path:</b> an "open" singing tone is mostly <i>not</i> air going through the nose. On sung vowels the soft palate is mostly <b>raised</b>, though some trained singers keep a small opening. The open quality comes from a long, wide throat and freely vibrating folds. The "mask" or nose sensation is <i>vibration</i>, and it gets stronger once the throat stops squeezing.</div>
+      <h4>Compare states</h4>
+      <div id="states"></div>
+      <div class="range"><div class="ends"><span>Throat-dominant</span><span>Open</span></div><input id="morph" type="range" min="0" max="100" value="100"></div>
+      <div id="stateText" class="note"></div>
+      <h4>Structural causes (medical, not trainable)</h4>
+      <p style="font-size:13px">Drag a slider to see what real tissue blockage does. If any of these sound like you, see an ENT or phoniatrician before investing years in exercises.</p>
+      <div id="structs"></div>
+    </div>
+    <div class="pane" id="p-exercises">
+      <p>Click an exercise to watch it on the model. Each one loops through its steps; you can pause, step through and change the speed at the bottom. The <b style="color:#ffd36a">yellow glows</b> show where you should feel it.</p>
+      <div class="note warn">Exercises change how the muscles <i>shape</i> the tube: larynx height, tongue position, wall tension, fold behavior. They don't remove tissue. Change builds over weeks and months of regular practice.</div>
+      <div id="exList"></div>
+      <div id="exDetail"></div>
+    </div>
+    <div class="pane" id="p-checks">
+      <p>Quick tests to find out which factors apply to <i>you</i>, so you know which exercises to prioritize.</p>
+      <div id="checks"></div>
+    </div>
+    <div class="pane" id="p-plan"><div id="plan"></div></div>
+    <div class="pane" id="p-sources"><p>Research and pedagogy sources behind the explanations and exercises:</p><ul id="sources"></ul></div>
+  </aside>
+</div>
+<script>/*BUNDLE*/</script>
+</body>
+</html>
